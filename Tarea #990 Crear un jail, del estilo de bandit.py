@@ -1,68 +1,42 @@
-import sys
-import traceback
-import os
-import builtins
-import math
-import random
-@author OVANDO CUPUL JOSE DOMINGO
+import ast
+import json
+@AUTHOR OVANDO CUPUL JOSE DOMINGO
 
-class RestrictedEnvironment:
-    def __init__(self):
-        # Limitar todas las funcionaliades que se ingresan en el script
-        self.safe_builtins = {
-            'print': print,
-            'input': input,
-            'len': len,
-            'str': str,
-            'int': int,
-            'float': float,
-            'list': list,
-            'tuple': tuple,
-            'dict': dict,
-            'range': range,
-            'abs': abs,
-            'sum': sum,
-            'min': min,
-            'max': max,
-        }
+class BanditJail:
+    def _init_(self):
+        self.rules = []
 
-        self.safe_builtins['open'] = self.restricted_open
+    def add_rule(self, rule):
+        self.rules.append(rule)
 
-        self.safe_modules = {
-            'math': math,
-            'random': random,
-        }
+    def process_file(self, filename):
+        with open(filename, 'r') as f:
+            content = f.read()
+        tree = ast.parse(content)
+        self.check_tree(tree)
 
-        self.user_globals = {}
+    def check_tree(self, tree):
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func_name = node.func.id
+                if func_name in ['open', 'socket']:
+                    # Check for potential SQL injection vulnerabilities
+                    arg_values = [arg.s for arg in node.args]
+                    if any([isinstance(arg_value, str) and arg_value.startswith('%') for arg_value in arg_values]):
+                        self.report_violation(f'Possible SQL injection vulnerability in {func_name} call')
 
-    def restricted_open(self, *args, **kwargs):
-        raise RuntimeError("Función 'open' está deshabilitada en este entorno.")
+                elif func_name == 'subprocess':
+                    # Check for shell command injection vulnerabilities
+                    args = [arg.s for arg in node.args]
+                    if any([arg.startswith('shell=True') for arg in args]):
+                        self.report_violation(f'Possible shell command injection vulnerability in {func_name} call')
 
-    def execute_code(self, code):
-        try:
-            exec(code, {'__builtins__': self.safe_builtins}, self.user_globals)
-        except Exception as e:
-            return f"Error: {str(e)}"
-        return "Evaluación exitosa."
+    def report_violation(self, message):
+        print(message)
 
-def main():
-    print("Bienvenido al jail de Python. Escribe 'exit' para salir.")
-    environment = RestrictedEnvironment()
+jail = BanditJail()
+jail.add_rule('sql_injection')
+jail.add_rule('shell_command_injection')
 
-    while True:
-        try:
-            user_code = input(">>> ")
-
-            if user_code.lower() == 'exit':
-                break
-
-            result = environment.execute_code(user_code)
-            print(result)
-        except KeyboardInterrupt:
-            print("\nSaliendo...")
-            break
-        except Exception as e:
-            print(f"Error: {str(e)}")
-
-if __name__ == "__main__":
-    main()
+# Process a sample Python file
+jail.process_file('example.py')
