@@ -20,13 +20,11 @@ class BanditJail:
             if isinstance(node, ast.Call):
                 func_name = node.func.id
                 if func_name in ['open', 'socket']:
-                    # Check for potential SQL injection vulnerabilities
                     arg_values = [arg.s for arg in node.args]
                     if any([isinstance(arg_value, str) and arg_value.startswith('%') for arg_value in arg_values]):
                         self.report_violation(f'Possible SQL injection vulnerability in {func_name} call')
 
                 elif func_name == 'subprocess':
-                    # Check for shell command injection vulnerabilities
                     args = [arg.s for arg in node.args]
                     if any([arg.startswith('shell=True') for arg in args]):
                         self.report_violation(f'Possible shell command injection vulnerability in {func_name} call')
@@ -38,5 +36,4 @@ jail = BanditJail()
 jail.add_rule('sql_injection')
 jail.add_rule('shell_command_injection')
 
-# Process a sample Python file
 jail.process_file('example.py')
